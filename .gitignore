@@ -1,0 +1,7 @@
+data/
+tinyproxy/
+
+# debug github actions
+.secrets
+.vars
+

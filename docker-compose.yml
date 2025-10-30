@@ -1,0 +1,79 @@
+services:
+  warp:
+    image: rpfilomeno/warp
+    container_name: warp
+    restart: unless-stopped
+    # add removed rule back (https://github.com/opencontainers/runc/pull/3468)
+    device_cgroup_rules:
+      - "c 10:200 rwm"
+    ports:
+      - "1080:1080"
+    environment:
+      - WARP_SLEEP=20
+      - BETA_FIX_HOST_CONNECTIVITY=yes
+      # - WARP_LICENSE_KEY= # optional
+      # - WARP_ENABLE_NAT=1 # enable nat
+      # Optionally override port tinyproxy is listening on.
+      - PORT=1080
+      # Set to "yes" to disable the Via-header, set to empty to leave it enabled.
+      - DISABLE_VIA_HEADER='yes'
+      # Set this to e.g. tinyproxy.stats to enable stats-page on that address
+      - STAT_HOST=tinyproxy.stats
+      - MAX_CLIENTS=100
+      # A space separated list. If not set or is empty, all networks are allowed.
+      # - ALLOWED_NETWORKS=127.0.0.1/8 192.168.65.0/24 172.18.0.1/16
+      # One of Critical, Error, Warning, Notice, Connect, Info
+      - LOG_LEVEL=Notice
+      # Maximum number of seconds idle connections are allowed to remain open
+      - TIMEOUT=900
+      # Username for BasicAuth
+      # -AUTH_USER= ''
+      # Password for BasicAuth (letters and digits only)
+      # Prefer secrets-mechanisms instead of environment variables.
+      # - AUTH_PASSWORD:= ''
+    cap_add:
+      # Docker already have them, these are for podman users
+      - MKNOD
+      - AUDIT_WRITE
+      # additional required cap for warp, both for podman and docker
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+      # uncomment for nat
+      # - net.ipv4.ip_forward=1
+      # - net.ipv6.conf.all.forwarding=1
+      # - net.ipv6.conf.all.accept_ra=2
+    tmpfs:
+      - /run
+    volumes:
+      - ./data:/var/lib/cloudflare-warp
+      - ./tinyproxy:/etc/tinyproxy
+    networks:
+      - local-services
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      # Healthcheck command for curl. Change port if you changed PORT environment variable above.
+      test:
+        [
+          "CMD",
+          "curl",
+          "-I",
+          "-H",
+          "Host: tinyproxy.stats",
+          "http://localhost:1080",
+        ]
+      # If you use use BasicAuth use this line instead, and replace <username>:<password> with your credentials and comment out the line above.
+      # test: ["CMD", "curl", "-u", "<username>:<password>", "-I", "-H", "Host: tinyproxy.stats", "http://localhost:8888"]
+      interval: 5m
+      timeout: 10s
+      retries: 1
+
+networks:
+  local-services:
+    # Specify driver options
+    driver: bridge
+    external: true
